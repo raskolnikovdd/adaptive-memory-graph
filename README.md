@@ -1,6 +1,10 @@
 # Adaptive Memory Graph
 
+<!-- mcp-name: io.github.raskolnikovdd/adaptive-memory-graph -->
+
 An MCP server plugin that gives Claude persistent, intelligent memory across sessions. It stores knowledge as weighted, interconnected nodes in a graph that evolves through conversation — nodes that get used gain weight, unused ones decay and eventually archive.
+
+Works with **Claude Code** and **Claude Desktop**.
 
 ## Features
 
@@ -10,6 +14,7 @@ An MCP server plugin that gives Claude persistent, intelligent memory across ses
 - **Encrypted storage** — AES-256-GCM encryption with macOS Keychain key storage
 - **Session logging** — Tracks which memories were accessed and how they were received
 - **Domain organization** — Nodes organized by domain (e.g. health_and_safety, personal, ideas_and_projects)
+- **Chat history ingestion** — Review and extract knowledge from past Claude Code sessions
 
 ## Installation
 
@@ -62,6 +67,8 @@ Add to your `claude_desktop_config.json`:
 | `amg_manual_adjust` | Boost, decay, archive, or delete nodes |
 | `amg_add_node` | Add new nodes to the graph |
 | `amg_search_nodes` | Search nodes by title, summary, tags, or content |
+| `amg_list_chat_sessions` | List available Claude Code chat sessions for review |
+| `amg_read_chat_session` | Read a chat session's conversation content |
 
 ## How It Works
 
