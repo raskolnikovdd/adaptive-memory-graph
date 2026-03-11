@@ -1,0 +1,25 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# MCP local config
+.mcp.json
+
+# macOS
+.DS_Store
+
+# Local wrapper script
+run_server.sh

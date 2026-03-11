@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "adaptive-memory-graph"
+version = "1.0.0"
+description = "Intelligent persistent memory graph MCP plugin for Claude — weighted, interconnected knowledge nodes that evolve through conversation"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "David Dunham" },
+]
+keywords = ["mcp", "claude", "memory", "graph", "ai", "plugin"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "mcp[cli]>=1.0.0",
+    "cryptography>=42.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/raskolnikovdd/adaptive-memory-graph"
+Repository = "https://github.com/raskolnikovdd/adaptive-memory-graph"
+Issues = "https://github.com/raskolnikovdd/adaptive-memory-graph/issues"
+
+[project.scripts]
+amg-server = "src.server:main"
