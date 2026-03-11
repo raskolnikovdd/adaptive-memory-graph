@@ -404,6 +404,177 @@ def amg_search_nodes(query: str, domain: str | None = None, include_archived: bo
     return json.dumps(results, indent=2)
 
 
+# ── Chat History Ingestion ────────────────────────────────────────────
+
+CLAUDE_DIR = Path.home() / ".claude"
+PROJECTS_DIR = CLAUDE_DIR / "projects"
+
+
+def _decode_project_name(dirname: str) -> str:
+    """Convert path-encoded directory name to readable project name."""
+    # e.g. "-Users-daviddunham-Documents-SMRT" → "SMRT"
+    parts = dirname.replace("-", "/").strip("/").split("/")
+    return parts[-1] if parts else dirname
+
+
+def _extract_messages(filepath: Path, max_messages: int = 100) -> list[dict]:
+    """Read a session JSONL and extract user/assistant text messages."""
+    messages = []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                msg = entry.get("message", {})
+                role = msg.get("role")
+                if role not in ("user", "assistant"):
+                    continue
+
+                content = msg.get("content", "")
+                # Handle string content
+                if isinstance(content, str) and content.strip():
+                    messages.append({
+                        "role": role,
+                        "text": content.strip(),
+                    })
+                # Handle list content (extract text blocks only)
+                elif isinstance(content, list):
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            text_parts.append(block.get("text", ""))
+                    if text_parts:
+                        messages.append({
+                            "role": role,
+                            "text": "\n".join(text_parts).strip(),
+                        })
+
+                if len(messages) >= max_messages:
+                    break
+    except (OSError, UnicodeDecodeError):
+        pass
+    return messages
+
+
+@mcp.tool()
+def amg_list_chat_sessions(project_filter: str = "") -> str:
+    """List available Claude Code chat sessions for review.
+
+    Scans ~/.claude/projects/ for conversation history. Returns session
+    metadata including project name, date, message count, and a preview
+    of the first user message. Use this to find sessions worth ingesting
+    into the memory graph.
+
+    Args:
+        project_filter: Optional substring to filter by project name.
+    """
+    if not PROJECTS_DIR.exists():
+        return json.dumps({"error": "No Claude projects directory found"})
+
+    sessions = []
+    for project_dir in sorted(PROJECTS_DIR.iterdir()):
+        if not project_dir.is_dir():
+            continue
+
+        project_name = _decode_project_name(project_dir.name)
+        if project_filter and project_filter.lower() not in project_name.lower():
+            continue
+
+        # Find session JSONL files (direct children, not subagents)
+        for session_dir in sorted(project_dir.iterdir()):
+            if not session_dir.is_dir():
+                # Top-level JSONL files
+                if session_dir.suffix == ".jsonl":
+                    jsonl_file = session_dir
+                    messages = _extract_messages(jsonl_file, max_messages=5)
+                    if messages:
+                        first_user = next(
+                            (m["text"][:150] for m in messages if m["role"] == "user"),
+                            "",
+                        )
+                        stat = jsonl_file.stat()
+                        sessions.append({
+                            "path": str(jsonl_file),
+                            "project": project_name,
+                            "date": datetime.fromtimestamp(
+                                stat.st_mtime, tz=timezone.utc
+                            ).strftime("%Y-%m-%d %H:%M"),
+                            "size_kb": round(stat.st_size / 1024, 1),
+                            "preview": first_user,
+                        })
+                continue
+
+            # Look for JSONL files inside session UUID dirs
+            for jsonl_file in sorted(session_dir.glob("*.jsonl")):
+                # Skip subagent files
+                if "subagents" in str(jsonl_file):
+                    continue
+
+                messages = _extract_messages(jsonl_file, max_messages=5)
+                if not messages:
+                    continue
+
+                first_user = next(
+                    (m["text"][:150] for m in messages if m["role"] == "user"),
+                    "",
+                )
+                stat = jsonl_file.stat()
+                sessions.append({
+                    "path": str(jsonl_file),
+                    "project": project_name,
+                    "date": datetime.fromtimestamp(
+                        stat.st_mtime, tz=timezone.utc
+                    ).strftime("%Y-%m-%d %H:%M"),
+                    "size_kb": round(stat.st_size / 1024, 1),
+                    "preview": first_user,
+                })
+
+    # Sort by date descending
+    sessions.sort(key=lambda s: s["date"], reverse=True)
+    return json.dumps({"total": len(sessions), "sessions": sessions}, indent=2)
+
+
+@mcp.tool()
+def amg_read_chat_session(session_path: str, max_messages: int = 100) -> str:
+    """Read a Claude Code chat session and return its conversation content.
+
+    Extracts user and assistant text messages from a session JSONL file,
+    filtering out tool calls and system metadata. Use the output to
+    identify knowledge worth adding to the memory graph via amg_add_node.
+
+    Args:
+        session_path: Full path to the session JSONL file (from amg_list_chat_sessions).
+        max_messages: Maximum number of messages to return (default 100).
+    """
+    filepath = Path(session_path)
+    if not filepath.exists():
+        return json.dumps({"error": f"File not found: {session_path}"})
+    if not filepath.suffix == ".jsonl":
+        return json.dumps({"error": "Not a JSONL file"})
+
+    messages = _extract_messages(filepath, max_messages=max_messages)
+    if not messages:
+        return json.dumps({"error": "No text messages found in session"})
+
+    # Format as readable conversation
+    lines = []
+    for msg in messages:
+        prefix = "USER" if msg["role"] == "user" else "ASSISTANT"
+        lines.append(f"[{prefix}]: {msg['text']}")
+        lines.append("")
+
+    return json.dumps({
+        "message_count": len(messages),
+        "conversation": "\n".join(lines),
+    }, indent=2)
+
+
 def main():
     mcp.run()
 
