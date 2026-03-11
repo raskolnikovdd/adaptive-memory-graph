@@ -34,5 +34,8 @@ Homepage = "https://github.com/raskolnikovdd/adaptive-memory-graph"
 Repository = "https://github.com/raskolnikovdd/adaptive-memory-graph"
 Issues = "https://github.com/raskolnikovdd/adaptive-memory-graph/issues"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src", "migrations"]
+
 [project.scripts]
 amg-server = "src.server:main"
